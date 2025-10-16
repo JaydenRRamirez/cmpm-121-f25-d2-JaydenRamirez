@@ -11,22 +11,24 @@ document.body.append(canvas);
 
 const ctx = canvas.getContext("2d")!;
 ctx.lineWidth = 2;
-const lines = [];
+type Point = { x: number; y: number };
+const lines: Point[][] = [];
 const cursor = { active: false, x: 0, y: 0 };
 
 function redraw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   lines.forEach((line) => {
-    if (line.length > 0) {
-      ctx.beginPath();
-      ctx.moveTo(line[0].x, line[0].y);
+    if (line.length === 0) return;
+    const first = line[0]!;
+    ctx.beginPath();
+    ctx.moveTo(first.x, first.y);
 
-      for (let i = 1; i < line.length; i++) {
-        ctx.lineTo(line[i].x, line[i].y);
-      }
-      ctx.stroke();
+    for (let i = 1; i < line.length; i++) {
+      const point = line[i]!;
+      ctx.lineTo(point.x, point.y);
     }
+    ctx.stroke();
   });
 }
 
@@ -40,9 +42,9 @@ canvas.addEventListener("mousedown", (e) => {
 });
 
 canvas.addEventListener("mousemove", (e) => {
-  if (cursor.active) {
+  if (cursor.active && lines.length > 0) {
     const newPoint = { x: e.offsetX, y: e.offsetY };
-    lines[lines.length - 1].push(newPoint);
+    lines[lines.length - 1]!.push(newPoint);
     canvas.dispatchEvent(new CustomEvent("drawing-changed"));
   }
 });
