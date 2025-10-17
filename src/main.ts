@@ -14,6 +14,7 @@ ctx.lineWidth = 2;
 type Point = { x: number; y: number };
 const lines: Point[][] = [];
 const cursor = { active: false, x: 0, y: 0 };
+const redoStack: Point[][] = [];
 
 function redraw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -35,6 +36,7 @@ function redraw() {
 canvas.addEventListener("drawing-changed", redraw);
 
 canvas.addEventListener("mousedown", (e) => {
+  redoStack.length = 0;
   cursor.active = true;
   const newPoint = { x: e.offsetX, y: e.offsetY };
   lines.push([newPoint]);
@@ -58,6 +60,40 @@ clearButton.textContent = "clear";
 document.body.append(clearButton);
 
 clearButton.addEventListener("click", () => {
+  redoStack.length = 0;
   lines.length = 0;
   canvas.dispatchEvent(new CustomEvent("drawing-changed"));
 });
+
+function undo() {
+  if (lines.length > 0) {
+    const lastAction = lines.pop();
+
+    if (lastAction) {
+      redoStack.push(lastAction);
+      canvas.dispatchEvent(new CustomEvent("drawing-changed"));
+    }
+  }
+}
+
+function redo() {
+  if (redoStack.length > 0) {
+    const undone = redoStack.pop();
+
+    if (undone) {
+      lines.push(undone);
+      canvas.dispatchEvent(new CustomEvent("drawing-changed"));
+    }
+  }
+}
+
+const undoButton = document.createElement("button");
+undoButton.textContent = "undo";
+document.body.append(undoButton);
+
+const redoButton = document.createElement("button");
+redoButton.textContent = "redo";
+document.body.append(redoButton);
+
+undoButton.addEventListener("click", undo);
+redoButton.addEventListener("click", redo);
