@@ -15,6 +15,8 @@ const lines: drawingCommand[] = [];
 const cursor = { active: false, x: 0, y: 0 };
 const redoStack: drawingCommand[] = [];
 let desiredThickness: number = 2;
+let current: "marker" | "sticker" = "marker";
+let stickerSelect: string = "\u{1F603}";
 
 let toolPreview: drawingCommand | null = null;
 
@@ -34,7 +36,7 @@ class markerPreview {
   }
 
   public display(ctx: CanvasRenderingContext2D): void {
-    if (!cursor.active) {
+    if (!cursor.active && current === "marker") {
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.thickness / 2, 0, 2 * Math.PI);
       ctx.fillStyle = "rgba(128, 128, 128, 0.6)";
@@ -49,6 +51,39 @@ class markerPreview {
 
   public updateThickness(thickness: number): void {
     this.thickness = thickness;
+  }
+}
+
+class stickerPreview {
+  private x: number;
+  private y: number;
+  private sticker: string;
+  private fontSize: number = 24;
+
+  constructor(x: number, y: number, sticker: string) {
+    this.x = x;
+    this.y = y;
+    this.sticker = sticker;
+  }
+
+  public display(ctx: CanvasRenderingContext2D): void {
+    if (!cursor.active && current === "sticker") {
+      ctx.font = `${this.fontSize}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.globalAlpha = 0.6;
+      ctx.fillText(this.sticker, this.x, this.y);
+      ctx.globalAlpha = 1.0;
+    }
+  }
+
+  public updatePosition(x: number, y: number): void {
+    this.x = x;
+    this.y = y;
+  }
+
+  public updateSticker(sticker: string): void {
+    this.sticker = sticker;
   }
 }
 
@@ -83,6 +118,31 @@ class markerLine {
   }
 }
 
+class stickerPlacement {
+  private x: number;
+  private y: number;
+  private sticker: string;
+  private fontSize: number = 32;
+
+  constructor(x: number, y: number, sticker: string) {
+    this.x = x;
+    this.y = y;
+    this.sticker = sticker;
+  }
+
+  public drag(x: number, y: number): void {
+    this.x = x;
+    this.y = y;
+  }
+
+  public display(ctx: CanvasRenderingContext2D): void {
+    ctx.font = `${this.fontSize}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(this.sticker, this.x, this.y);
+  }
+}
+
 function redraw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -95,6 +155,28 @@ function redraw() {
   }
 }
 
+function updateToolPreview() {
+  if (current === "marker") {
+    if (!(toolPreview instanceof markerPreview)) {
+      toolPreview = new markerPreview(0, 0, desiredThickness);
+    }
+
+    if (toolPreview instanceof markerPreview) {
+      toolPreview.updateThickness(desiredThickness);
+    }
+  } else if (current === "sticker") {
+    if (!(toolPreview instanceof stickerPreview)) {
+      toolPreview = new stickerPreview(0, 0, stickerSelect);
+    }
+
+    if (toolPreview instanceof stickerPreview) {
+      toolPreview.updateSticker(stickerSelect);
+    }
+  }
+}
+
+updateToolPreview();
+
 toolPreview = new markerPreview(0, 0, desiredThickness);
 
 canvas.addEventListener("tool-moved", redraw);
@@ -105,21 +187,43 @@ canvas.addEventListener("mousedown", (e) => {
   cursor.active = true;
   const initialPoint = { x: e.offsetX, y: e.offsetY };
 
-  const newLine = new markerLine(initialPoint, desiredThickness);
-  lines.push(newLine);
+  let newCommand: drawingCommand;
 
-  canvas.dispatchEvent(new CustomEvent("tool-moved"));
+  if (current === "marker") {
+    newCommand = new markerLine(initialPoint, desiredThickness);
+  } else {
+    newCommand = new stickerPlacement(
+      initialPoint.x,
+      initialPoint.y,
+      stickerSelect,
+    );
+  }
+
+  lines.push(newCommand);
+
+  if (current === "sticker") {
+    canvas.dispatchEvent(new CustomEvent("drawing-changed"));
+  } else {
+    canvas.dispatchEvent(new CustomEvent("tool-moved"));
+  }
 });
 
 canvas.addEventListener("mousemove", (e) => {
-  if (toolPreview instanceof markerPreview) {
+  if (toolPreview instanceof markerPreview && current === "marker") {
+    toolPreview.updatePosition(e.offsetX, e.offsetY);
+    canvas.dispatchEvent(new CustomEvent("tool-moved"));
+  } else if (toolPreview instanceof stickerPreview && current === "sticker") {
     toolPreview.updatePosition(e.offsetX, e.offsetY);
     canvas.dispatchEvent(new CustomEvent("tool-moved"));
   }
+
   if (cursor.active && lines.length > 0) {
     const currentCommand = lines[lines.length - 1];
 
     if (currentCommand instanceof markerLine) {
+      currentCommand.drag(e.offsetX, e.offsetY);
+      canvas.dispatchEvent(new CustomEvent("drawing-changed"));
+    } else if (currentCommand instanceof stickerPlacement) {
       currentCommand.drag(e.offsetX, e.offsetY);
       canvas.dispatchEvent(new CustomEvent("drawing-changed"));
     }
@@ -157,18 +261,24 @@ const toolSelect = document.createElement("div");
 toolSelect.classList.add("tool-select");
 document.body.append(toolSelect);
 
+const markerGroup = document.createElement("div");
+markerGroup.textContent = "Marker: ";
+toolSelect.append(markerGroup);
+
 const thinMarker = document.createElement("button");
 thinMarker.textContent = "thin";
 thinMarker.classList.add("tool-button", "selectedTool");
-toolSelect.append(thinMarker);
+markerGroup.append(thinMarker);
 
 const thickMarker = document.createElement("button");
 thickMarker.textContent = "thick";
 thickMarker.classList.add("tool-button");
-toolSelect.append(thickMarker);
+markerGroup.append(thickMarker);
 
 function tool(thickness: number, selectedButton: HTMLButtonElement) {
   desiredThickness = thickness;
+  current = "marker";
+  updateToolPreview();
 
   if (toolPreview instanceof markerPreview) {
     toolPreview.updateThickness(thickness);
@@ -191,9 +301,53 @@ thickMarker.addEventListener("click", () => {
   tool(5, thickMarker);
 });
 
+const stickerGroup = document.createElement("div");
+stickerGroup.textContent = "Stickers: ";
+toolSelect.append(stickerGroup);
+
+const stickerChoices = [
+  { emoji: "\u{1F603}", name: "Smile" },
+  { emoji: "\u{1F47E}", name: "Alien Monster" },
+  { emoji: "\u{1F49C}", name: "Purple Heart" },
+];
+
+const utilityButtonContainer = document.createElement("div");
+utilityButtonContainer.classList.add("utility-buttons");
+document.body.append(utilityButtonContainer);
+
+function selectStickerTool(emoji: string, selectedButton: HTMLButtonElement) {
+  stickerSelect = emoji;
+  current = "sticker";
+  updateToolPreview();
+
+  if (toolPreview instanceof stickerPreview) {
+    toolPreview.updateSticker(emoji);
+  }
+
+  document.querySelectorAll(".tool-button").forEach((btn) => {
+    btn.classList.remove("selectedTool");
+  });
+
+  selectedButton.classList.add("selectedTool");
+  canvas.dispatchEvent(new CustomEvent("tool-moved"));
+}
+
+stickerChoices.forEach((stickerData) => {
+  const stickerButton = document.createElement("button");
+  stickerButton.textContent = stickerData.emoji;
+  stickerButton.title = stickerData.name;
+  stickerButton.classList.add("tool-button", "sticker-button");
+
+  stickerGroup.append(stickerButton);
+
+  stickerButton.addEventListener("click", () => {
+    selectStickerTool(stickerData.emoji, stickerButton);
+  });
+});
+
 const clearButton = document.createElement("button");
 clearButton.textContent = "clear";
-document.body.append(clearButton);
+utilityButtonContainer.append(clearButton);
 
 clearButton.addEventListener("click", () => {
   redoStack.length = 0;
@@ -203,11 +357,14 @@ clearButton.addEventListener("click", () => {
 
 const undoButton = document.createElement("button");
 undoButton.textContent = "undo";
-document.body.append(undoButton);
+utilityButtonContainer.append(undoButton);
 
 const redoButton = document.createElement("button");
 redoButton.textContent = "redo";
-document.body.append(redoButton);
+utilityButtonContainer.append(redoButton);
 
 undoButton.addEventListener("click", undo);
 redoButton.addEventListener("click", redo);
+
+tool(0.5, thinMarker);
+redraw();
