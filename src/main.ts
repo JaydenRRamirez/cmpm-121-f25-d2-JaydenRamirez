@@ -16,8 +16,40 @@ const cursor = { active: false, x: 0, y: 0 };
 const redoStack: drawingCommand[] = [];
 let desiredThickness: number = 2;
 
+let toolPreview: drawingCommand | null = null;
+
 interface drawingCommand {
   display(ctx: CanvasRenderingContext2D): void;
+}
+
+class markerPreview {
+  private x: number;
+  private y: number;
+  private thickness: number;
+
+  constructor(x: number, y: number, thickness: number) {
+    this.x = x;
+    this.y = y;
+    this.thickness = thickness;
+  }
+
+  public display(ctx: CanvasRenderingContext2D): void {
+    if (!cursor.active) {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.thickness / 2, 0, 2 * Math.PI);
+      ctx.fillStyle = "rgba(128, 128, 128, 0.6)";
+      ctx.fill();
+    }
+  }
+
+  public updatePosition(x: number, y: number): void {
+    this.x = x;
+    this.y = y;
+  }
+
+  public updateThickness(thickness: number): void {
+    this.thickness = thickness;
+  }
 }
 
 class markerLine {
@@ -37,6 +69,7 @@ class markerLine {
     if (this.points.length === 0) return;
 
     ctx.lineWidth = this.thickness;
+    ctx.strokeStyle = "black";
 
     const first = this.points[0]!;
     ctx.beginPath();
@@ -56,8 +89,15 @@ function redraw() {
   lines.forEach((command) => {
     command.display(ctx);
   });
+
+  if (toolPreview) {
+    toolPreview.display(ctx);
+  }
 }
 
+toolPreview = new markerPreview(0, 0, desiredThickness);
+
+canvas.addEventListener("tool-moved", redraw);
 canvas.addEventListener("drawing-changed", redraw);
 
 canvas.addEventListener("mousedown", (e) => {
@@ -67,9 +107,15 @@ canvas.addEventListener("mousedown", (e) => {
 
   const newLine = new markerLine(initialPoint, desiredThickness);
   lines.push(newLine);
+
+  canvas.dispatchEvent(new CustomEvent("tool-moved"));
 });
 
 canvas.addEventListener("mousemove", (e) => {
+  if (toolPreview instanceof markerPreview) {
+    toolPreview.updatePosition(e.offsetX, e.offsetY);
+    canvas.dispatchEvent(new CustomEvent("tool-moved"));
+  }
   if (cursor.active && lines.length > 0) {
     const currentCommand = lines[lines.length - 1];
 
@@ -82,6 +128,7 @@ canvas.addEventListener("mousemove", (e) => {
 
 canvas.addEventListener("mouseup", () => {
   cursor.active = false;
+  canvas.dispatchEvent(new CustomEvent("tool-moved"));
 });
 
 function undo() {
@@ -123,11 +170,17 @@ toolSelect.append(thickMarker);
 function tool(thickness: number, selectedButton: HTMLButtonElement) {
   desiredThickness = thickness;
 
+  if (toolPreview instanceof markerPreview) {
+    toolPreview.updateThickness(thickness);
+  }
+
   document.querySelectorAll(".tool-button").forEach((btn) => {
     btn.classList.remove("selectedTool");
   });
 
   selectedButton.classList.add("selectedTool");
+
+  canvas.dispatchEvent(new CustomEvent("tool-moved"));
 }
 
 thinMarker.addEventListener("click", () => {
