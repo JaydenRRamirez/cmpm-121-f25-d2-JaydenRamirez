@@ -305,7 +305,13 @@ const stickerGroup = document.createElement("div");
 stickerGroup.textContent = "Stickers: ";
 toolSelect.append(stickerGroup);
 
-const stickerChoices = [
+interface stickerData {
+  emoji: string;
+  name: string;
+  element?: HTMLButtonElement;
+}
+
+const stickerChoices: stickerData[] = [
   { emoji: "\u{1F603}", name: "Smile" },
   { emoji: "\u{1F47E}", name: "Alien Monster" },
   { emoji: "\u{1F49C}", name: "Purple Heart" },
@@ -332,17 +338,52 @@ function selectStickerTool(emoji: string, selectedButton: HTMLButtonElement) {
   canvas.dispatchEvent(new CustomEvent("tool-moved"));
 }
 
-stickerChoices.forEach((stickerData) => {
-  const stickerButton = document.createElement("button");
-  stickerButton.textContent = stickerData.emoji;
-  stickerButton.title = stickerData.name;
-  stickerButton.classList.add("tool-button", "sticker-button");
+function renderStickerButton() {
+  const existingButtons = stickerGroup.querySelectorAll(".sticker-button");
+  existingButtons.forEach((btn) => btn.remove());
 
-  stickerGroup.append(stickerButton);
+  stickerChoices.forEach((stickerData) => {
+    const stickerButton = document.createElement("button");
+    stickerButton.textContent = stickerData.emoji;
+    stickerButton.title = stickerData.name;
+    stickerButton.classList.add("tool-button", "sticker-button");
+    stickerData.element = stickerButton;
+    stickerGroup.append(stickerButton);
 
-  stickerButton.addEventListener("click", () => {
-    selectStickerTool(stickerData.emoji, stickerButton);
+    stickerButton.addEventListener("click", () => {
+      selectStickerTool(stickerData.emoji, stickerButton);
+    });
   });
+}
+
+renderStickerButton();
+
+const customStickerButton = document.createElement("button");
+customStickerButton.textContent = "📝 Custom";
+customStickerButton.classList.add("tool-button");
+stickerGroup.append(customStickerButton);
+
+customStickerButton.addEventListener("click", () => {
+  const newStickerText = prompt(
+    "Enter custom sticker (either text or emoji):",
+  );
+
+  if (newStickerText && newStickerText.trim().length > 0) {
+    const newSticker: stickerData = {
+      emoji: newStickerText.trim(),
+      name: `Custom Sticker: ${newStickerText.trim().length > 0}`,
+    };
+
+    stickerChoices.push(newSticker);
+
+    renderStickerButton();
+
+    const newButton = newSticker.element;
+
+    if (newButton) {
+      selectStickerTool(newSticker.emoji, newButton);
+    }
+  }
 });
 
 const clearButton = document.createElement("button");
