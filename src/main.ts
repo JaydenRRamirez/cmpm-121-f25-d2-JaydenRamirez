@@ -103,7 +103,9 @@ class markerLine {
   public display(ctx: CanvasRenderingContext2D): void {
     if (this.points.length === 0) return;
 
-    ctx.lineWidth = this.thickness;
+    const scale = ctx.canvas.width / 256;
+
+    ctx.lineWidth = this.thickness * scale;
     ctx.strokeStyle = "black";
 
     const first = this.points[0]!;
@@ -122,7 +124,7 @@ class stickerPlacement {
   private x: number;
   private y: number;
   private sticker: string;
-  private fontSize: number = 32;
+  private baseFontSize: number = 32;
 
   constructor(x: number, y: number, sticker: string) {
     this.x = x;
@@ -136,7 +138,10 @@ class stickerPlacement {
   }
 
   public display(ctx: CanvasRenderingContext2D): void {
-    ctx.font = `${this.fontSize}px sans-serif`;
+    const scale = ctx.canvas.width / 256;
+    const fontSize = this.baseFontSize * scale;
+
+    ctx.font = `${fontSize}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(this.sticker, this.x, this.y);
@@ -406,6 +411,33 @@ utilityButtonContainer.append(redoButton);
 
 undoButton.addEventListener("click", undo);
 redoButton.addEventListener("click", redo);
+
+const exportButton = document.createElement("button");
+exportButton.textContent = "Export 🖼️";
+utilityButtonContainer.append(exportButton);
+
+exportButton.addEventListener("click", () => {
+  const exportSize = 1024;
+  const scaleFactor = exportSize / canvas.width;
+
+  const highResCanvas = document.createElement("canvas");
+  highResCanvas.width = exportSize;
+  highResCanvas.height = exportSize;
+  const highResCtx = highResCanvas.getContext("2d")!;
+
+  highResCtx.scale(scaleFactor, scaleFactor);
+
+  highResCtx.clearRect(0, 0, exportSize, exportSize);
+
+  lines.forEach((command) => {
+    command.display(highResCtx);
+  });
+
+  const anchor = document.createElement("a");
+  anchor.href = highResCanvas.toDataURL("image/png");
+  anchor.download = "sticker-sketchpad-highres.png";
+  anchor.click();
+});
 
 tool(0.5, thinMarker);
 redraw();
