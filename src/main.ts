@@ -37,10 +37,14 @@ class markerPreview {
 
   public display(ctx: CanvasRenderingContext2D): void {
     if (!cursor.active && current === "marker") {
+      ctx.fillStyle = "rgba(128, 128, 128, 0.8)";
+      ctx.strokeStyle = "black";
+      ctx.lineWidth = 1;
+      const radius = this.thickness / 2;
       ctx.beginPath();
-      ctx.arc(this.x, this.y, this.thickness / 2, 0, 2 * Math.PI);
-      ctx.fillStyle = "rgba(128, 128, 128, 0.6)";
+      ctx.arc(this.x, this.y, radius, 0, 2 * Math.PI);
       ctx.fill();
+      ctx.stroke();
     }
   }
 
