@@ -1,5 +1,6 @@
 import "./style.css";
 
+// 🔧 Configuration & State
 const h1 = document.createElement("h1");
 h1.textContent = "Sticker Sketchpad";
 document.body.append(h1);
@@ -22,6 +23,7 @@ let canvasRotation: number = 0;
 
 let toolPreview: drawingCommand | null = null;
 
+// 🎨 Drawing Abstraction (Command Pattern)
 interface drawingCommand {
   display(ctx: CanvasRenderingContext2D): void;
 }
@@ -337,6 +339,7 @@ function redo() {
   }
 }
 
+// 🖱️ Event Listeners & UI
 const toolSelect = document.createElement("div");
 toolSelect.classList.add("tool-select");
 document.body.append(toolSelect);
